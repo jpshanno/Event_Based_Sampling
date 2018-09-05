@@ -1,0 +1,208 @@
+' Event-based ISCO Sampling Triggered via a Standard eTape Assembly with Voltage Divider
+
+' Author: Joe Shannon
+' Last Modified: 2018-08-30
+' 
+
+' Summary:
+' --------
+' This program is designed for a CR800 datalogger to connected to a standard 
+' assembly eTape from Milone Technologies with the standard voltage divider 
+' output. The purpose of the program is to trigger sampling on an ISCO autosampler
+' whenever a storm event is detected and every 24 hours if a storm event is not 
+' detected. It calculates a rolling mean hourly water level change (2-hr, 6-hr, 
+' and 24-hr), and a rolling standard deviation of the change in 24-hr mean 
+' water level. An event is triggered when the change in 24-hr mean water level 
+' is greater than the mean change plus a 99.5% confidence interval (2.58 * SD). 
+' The 6-hr rolling mean water level must be greater than 0.1 cm for an event 
+' to be triggered. The hydrograph limb is set to "rising" and hourly sampling
+' begins. When the 2-hr rolling mean water level change is less than 0 the 
+' rising limib is set to "falling". Hourly sampling continues until the water
+' level returns to 110% of the water level at the start of the event. This 
+' level may be changed in the future to capture more of the falling limb.
+
+' Notes:
+' ------
+' This calibration is for the eTape currently deployed at 113. It is fitted with 
+' a 0-5 V output converter rather than a voltage divider. The latter probably the 
+' better option as the voltage divider is more robust than the output converter.
+' Speaking with Chris Milone he said there is no chip in the voltage divider,
+' which means a wiring error will not destroy the eTape.
+
+' The linear regression used to convert eTape measurements (mV) to water level (cm)
+' was taken from ...
+
+' Water Level (cm) = 0.009891 * eTape (mv)  + 0.498129
+
+' Set-up:
+' -------
+
+' Wiring:
+' eTape	|	CR800
+' -----------------
+' Vin	|	12V
+' Vout	|	1H
+' Gnd	|	Ground
+
+' Declare Variables and Units
+Public batteryVoltage
+Public loggerTemp
+Public bottleNumber As LONG
+Public eTape As FLOAT
+Public waterLevel As FLOAT ' hourlyWL_cm
+Public laggedWaterLevel As FLOAT ' lag(hourlyWL_cm, 1)
+Public deltaWaterLevel_1hr As FLOAT ' deltaWL_1hr = hourlyWL_cm - lag(hourlyWL_cm, 1)
+Public dailyWaterLevel As FLOAT ' meanDailyWL_cm = roll_meanr(hourlyWL_cm, 24)
+Public laggedDailyWaterLevel As FLOAT ' lag(meanDailyWL_cm, 1)
+Public deltaDailyWaterLevel As FLOAT ' meanDailyDeltaWL = meanDailyWL_cm - lag(meanDailyWL_cm, 1)
+Public meanDeltaDailyWL_24hr As FLOAT ' meanDeltaWL_24hr = roll_meanr(meanDailyDeltaWL, 24)
+Public squareDiff(24) As FLOAT
+Public counter As LONG
+Public sumDiffIndex As LONG
+Public sumOfSquares As FLOAT
+Public sdDeltaDailyWL_24hr As FLOAT ' sdDeltaWL_24hr = roll_sdr(meanDailyDeltaWL, 24)
+Public meanDeltaWL_6hr As FLOAT ' meanDeltaWL_6hr = roll_meanr(deltaWL_1hr, 6)
+Public meanDeltaWL_2hr As FLOAT
+Public samplingEvent As BOOLEAN
+Public hydrographLimb As STRING
+Public startWaterLevel As FLOAT
+Public hoursAfterSample As LONG
+
+Units batteryVoltage = Volts
+Units loggerTemp = Celsius
+Units eTape = mV
+Units waterLevel = cm
+Units laggedWaterLevel = cm
+Units deltaWaterLevel_1hr = cm
+Units meanDeltaWL_2hr = cm
+Units meanDeltaWL_6hr = cm
+Units dailyWaterLevel = cm
+Units laggedDailyWaterLevel = cm
+Units deltaDailyWaterLevel = cm
+Units meanDeltaDailyWL_24hr = cm
+Units sdDeltaDailyWL_24hr = cm
+Units startWaterLevel = cm
+Units hoursAfterSample = hours
+
+
+'Define Data Tables.
+DataTable (Diagnostics, 1, -1)
+  Sample (1, batteryVoltage, FLOAT)
+  Sample (1, loggerTemp, FLOAT)
+EndTable
+
+DataTable (Water_Level, 1, -1) 'Set table size to # of records, or -1 to autoallocate.
+  Sample(1, bottleNumber, LONG)
+  Sample(1, eTape, FLOAT)
+  Sample(1, waterLevel, FLOAT)
+  Sample(1, laggedWaterLevel, FLOAT)
+  Sample(1, deltaWaterLevel_1hr, FLOAT)
+  Sample(1, meanDeltaWL_2hr, FLOAT)
+  Sample(1, meanDeltaWL_6hr, FLOAT)
+  Sample(1, dailyWaterLevel, FLOAT)
+  Sample(1, laggedDailyWaterLevel, FLOAT)
+  Sample(1, deltaDailyWaterLevel, FLOAT)
+  Sample(1, meanDeltaDailyWL_24hr, FLOAT)
+  Sample(1, sdDeltaDailyWL_24hr, FLOAT)
+  Sample(1, samplingEvent, FLOAT)
+  Sample(1, hydrographLimb, STRING)
+  Sample(1, startWaterLevel, FLOAT)
+  Sample(1, hoursAfterSample, LONG)
+EndTable
+
+DataTable (ISCO, 1, -1)
+  Sample(1, bottleNumber, LONG)
+  Sample(1, waterLevel, FLOAT)
+  Sample(1, hydrographLimb, STRING)
+EndTable
+
+
+'Main Program
+BeginProg
+
+samplingEvent = false
+startWaterLevel = 0
+bottleNumber = 0
+hoursAfterSample = -1
+hydrographLimb = "NA"
+counter = -1
+squareDiff = 0
+
+VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
+waterLevel = (0.009891 * eTape)  + 0.498129
+laggedWaterLevel = waterLevel
+laggedDailyWaterLevel =waterLevel
+
+	Scan(60, Min, 1, 0)
+    hoursAfterSample = hoursAfterSample + 1
+    counter = counter + 1
+    sumDiffIndex = (counter MOD 24) + 1
+
+		'Default Datalogger Battery Voltage measurement BattV
+		Battery(batteryVoltage)
+    PanelTemp(loggerTemp, _60Hz)
+
+  	' Measure eTape and calculate water level from eTape calibration. Use running average to calculate the mean daily water level
+		VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
+		waterLevel = (0.009891 * eTape)  + 0.498129
+    AvgRun(dailyWaterLevel, 1, waterLevel, 24)
+
+    ' Calculate change in hourly and daily water levels and a 6 hour running mean hourly change in water level
+    deltaWaterLevel_1hr = waterLevel - laggedWaterLevel
+    deltaDailyWaterLevel = dailyWaterLevel - laggedDailyWaterLevel
+    AvgRun(meanDeltaWL_2hr, 1, deltaWaterLevel_1hr, 3)
+    AvgRun(meanDeltaWL_6hr, 1, deltaWaterLevel_1hr, 6)
+
+    ' Calculate the mean and standard deviation of the daily water level over a 24 hour period
+    AvgRun(meanDeltaDailyWL_24hr, 1, deltaDailyWaterLevel, 24)
+
+    squareDiff(sumDiffIndex) = (deltaDailyWaterLevel - meanDeltaDailyWL_24hr)^2
+    sumOfSquares = squareDiff(1) + squareDiff(2) + squareDiff(3) + squareDiff(4) + squareDiff(5) + squareDiff(6) + squareDiff(7) + squareDiff(8) + squareDiff(9) + squareDiff(10) + squareDiff(11) + squareDiff(12) + squareDiff(13) + squareDiff(14) + squareDiff(15) + squareDiff(16) + squareDiff(17) + squareDiff(18) + squareDiff(19) + squareDiff(20) + squareDiff(21) + squareDiff(22) + squareDiff(23) + squareDiff(24)
+
+    sdDeltaDailyWL_24hr = Sqr(sumOfSquares / 23)
+
+    If samplingEvent = false Then
+      samplingEvent = deltaDailyWaterLevel >= meanDeltaDailyWL_24hr + 2.575829 * sdDeltaDailyWL_24hr AND meanDeltaWL_6hr > 0.1
+    End If
+
+    If samplingEvent = true Then
+
+      If startWaterLevel = 0 Then
+        startWaterLevel = waterLevel
+        hydrographLimb = "rising"
+      Else
+        If meanDeltaWL_2hr < 0 Then
+          hydrographLimb = "falling"
+        End If
+      End If
+
+      If bottleNumber < 24 Then
+        PulsePort(1, 25000)
+        hoursAfterSample = 0
+        bottleNumber = bottleNumber + 1
+        CallTable(ISCO)
+      EndIf
+
+      If hydrographLimb = "falling" AND waterLevel <= startWaterLevel * 1.1 Then
+       samplingEvent = false
+       startWaterLevel = 0
+       hydrographLimb = "NA"
+      EndIf
+
+    EndIf
+
+    If hoursAfterSample = 24 AND bottleNumber < 24 Then
+      PulsePort(1, 25000)
+      hoursAfterSample = 0
+      bottleNumber = bottleNumber + 1
+      CallTable(ISCO)
+    EndIf
+
+    laggedWaterLevel = waterLevel
+    laggedDailyWaterLevel = dailyWaterLevel
+
+    CallTable(Diagnostics)
+    CallTable(Water_Level)
+
+  NextScan
+EndProg
