@@ -95,3 +95,5 @@ __Water_Level__
 - [ ] Slow rising limbs are missed, not quite event, but wet-up periods. Perhaps
 this is fine because it is captured by the interval sampling
 - [ ] Add example data and figure
+- [ ] Convert intermediate variables to declaration by Dim rather than Public
+- [ ] Test storing deltaDailyWaterLevel in an array and calculating the standard deviation using StdDevSpa
