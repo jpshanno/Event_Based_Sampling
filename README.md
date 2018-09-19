@@ -34,10 +34,9 @@ to avoid sample mixing.
 (this script has been tested using the 3700 Portable Sampler)  
 - Campbell Scientific Datalogger (this script is written for a CR800)  
 - [Milone Technologies Standard eTape](https://milonetech.com/)
-  - I have tested sampling using two of the three output modules for eTapes. I recommend the Voltage
-  Divider rather than the 0-5V Resistance to Voltage module. Experience and personal communications
+  - I have tested sampling using the Voltage Divider and 0-5 V Resistance to Voltage output modules. Experience and personal communications
   with the manufacturer shows that the Voltage Divider is a more robust option that will not be immediately
-  damaged from a shorted circuit or wiring error
+  damaged from a shorted circuit or wiring error, however your precision will be reduced as the range of teh eTape is recorded from 2.5-5 V rather than 0-5 V.
 
 # Set up
 Wiring guide for the CR800 and the two tested output module of eTapes
@@ -85,13 +84,15 @@ __Water_Level__
 
 # To Do
 - [ ] Update ISCO wiring guide in CRBasic programs  
-- [ ] Set up a constants table for threshold values (0.1 cm, 24 hours between samples, etc) to allow easier customization  
+- [ ] Set up a constants table for threshold values (0.1 cm, 24 hours between samples, yes or no for interval sampling, etc) to allow easier customization  
     - THIS NEEDS TO BE A PRIORITY. Whenever restarting the program to reset the
     bottle number it risks making a slowly rising hydrograph look like an events
     because there is not 24-hours of data to smooth the mean and sd.
 - [ ] Evaluate and adjust as needed the 110% threshold for ending events  
 - [ ] Set a minimum water level to avoid interval sampling when no flow is present  
 - [ ] Add sequential mode call to program
-- [ ] Slow rising limbs are missed, not quite event, but wet-up periods. Perhaps
+- [ ] Slow rising limbs are missed, not and quite event, but wet-up periods. Perhaps
 this is fine because it is captured by the interval sampling
 - [ ] Add example data and figure
+- [ ] Convert intermediate variables to declaration by Dim rather than Public
+- [ ] Test storing deltaDailyWaterLevel in an array and calculating the standard deviation using StdDevSpa
