@@ -12,19 +12,19 @@
 ' whenever a storm event is detected and every 24 hours if a storm event is not
 ' detected. It calculates a rolling mean hourly water level change (2-hr, 6-hr,
 ' and 24-hr), and a rolling standard deviation of the change in 24-hr mean
-' water level. An event is triggered when the change in 24-hr mean water level
+' water level. An event is triggered when the change in 24-hr mean water level 
 ' is greater than the mean change plus a 99.5% confidence interval (2.58 * SD).
 ' The 6-hr rolling mean water level must be greater than minimum_event_size (cm)
 ' for an event to be triggered. The hydrograph limb is set to "rising" and hourly
 ' sampling begins. When the 2-hr rolling mean water level change is less than 0 the
-' rising limb is set to "falling". Hourly sampling continues until the water
+' rising limib is set to "falling". Hourly sampling continues until the water
 ' level returns to a user-defined percentage of the water level at the start of
-' the event (see nonevent_interval constant and set as decimal value, i.e.
+' the event (see non-event_interval constant and set as decimal value, i.e.
 ' 1.0 = 100%).
 
 ' When the program is recompiled on the datalogger most existing variable values
 ' a retained. The variables bottleNumber, startWaterLevel, bottleNumber,
-' hoursAfterSample, hydrographLimb, counter, and preevent_check are reset, which
+' hoursAfterSample, hydrographLimb, counter, and pre-event_check are reset, which
 ' makes the assumption that the logger would not be restarted during a flow event.
 ' Additionally when the program is recompiled no samples will be taken until the
 ' summed squared differences from the mean of the change in the 24-hour rolling
@@ -57,10 +57,10 @@
 
 ' falling_limb_threshold - The water level used to signal the end of an event,
 '   defined as a proportion of the water level at the start of an event.
-' nonevent_interval - The number of hours between samples during non-event flow
+' non-event_interval - The number of hours between samples during non-event flow
 ' eTape_intercept - The slope of the eTape calibration curve
 ' eTape_slope - The intercept of the eTape calibration curve
-' preevent_period - The number of hours of data to capture before checking for
+' pre-event_period - The number of hours of data to capture before checking for
 '   events. This helps prevent false positives.
 ' minimum_event_size - The minimum change in the 6-hour rolling mean that would
 '   be considered an event. This is to avoid vey small changes from triggering an
@@ -231,6 +231,10 @@ counter = -1
 
     squareDiff(sumDiffIndex) = (deltaDailyWaterLevel - meanDeltaDailyWL_24hr)^2
     sumOfSquares = squareDiff(1) + squareDiff(2) + squareDiff(3) + squareDiff(4) + squareDiff(5) + squareDiff(6) + squareDiff(7) + squareDiff(8) + squareDiff(9) + squareDiff(10) + squareDiff(11) + squareDiff(12) + squareDiff(13) + squareDiff(14) + squareDiff(15) + squareDiff(16) + squareDiff(17) + squareDiff(18) + squareDiff(19) + squareDiff(20) + squareDiff(21) + squareDiff(22) + squareDiff(23) + squareDiff(24)
+
+    For I = pre-event_offset + 1 to 24
+      pre-event_check = squareDiff(I) + pre-event_check
+    Next I
 
     For I = preevent_period + 1 to 24
       preevent_check = squareDiff(I) + preevent_check

@@ -61,6 +61,8 @@
 ' -------
 
 ' Wiring:
+' -------
+
 ' eTape	|	CR800
 ' ---------------
 ' Vin	|	5V
@@ -69,7 +71,8 @@
 
 ' ISCO	|	CR800
 ' ---------------
-' 
+' Pin A	|	SDI 12V
+' Pin C	|	SDI C1
 
 ' Declare Variables and Units
 Public batteryVoltage
