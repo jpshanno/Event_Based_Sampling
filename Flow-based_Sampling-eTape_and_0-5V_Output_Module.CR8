@@ -82,6 +82,15 @@
 
 ' -----------------------------------------------------------------------------
 
+
+' The first time it is run you should let it do 24 hours because the array is
+' populated with zeroes. After that running reboot in Terminal Emulator should
+' reset the necessary variables without losing the array info so there would be
+' no lost data. Could use preevent_interval to fill in the zeroes in the array
+' with the mean of the preevent_interval (would have artifically low sd).
+' Also, first value of delta WL is first measured water level - 0. Could launch
+' and then run 'reboot' after the first reading
+
 ' Set mode
 SequentialMode
 
@@ -119,8 +128,10 @@ Public hydrographLimb As STRING
 Public startWaterLevel As FLOAT
 Public hoursAfterSample As LONG
 
-
-
+Public preevent_delta_wl_24_array(24)
+Public preevent_mean
+Public preevent_sd
+Public sample_threshold
 Public avgTest
 Public sdTest
 Public delta_wl_24_array(24)
@@ -137,7 +148,7 @@ Dim preevent_check
 Units batteryVoltage = Volts
 Units loggerTemp = Celsius
 Units eTape = mV
-Units waterLevel = cm
+'Units waterLevel = cm
 Units laggedWaterLevel = cm
 Units deltaWaterLevel_1hr = cm
 Units meanDeltaWL_2hr = cm
@@ -193,7 +204,7 @@ PreserveVariables()
 bottleNumber = 0
 counter = -1
 
-	Scan(60, Min, 1, 0)
+	Scan(5, sec, 1, 0)
 
     hoursAfterSample = hoursAfterSample + 1
     counter = counter + 1
@@ -204,8 +215,9 @@ counter = -1
     PanelTemp(loggerTemp, _60Hz)
 
   	' Measure eTape and calculate water level from eTape calibration. Use running average to calculate the mean daily water level
-	  VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
-	  waterLevel = (eTape_slope * eTape)  + eTape_intercept
+	  'VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
+    Therm107(waterLevel,1,1,1,0,_60Hz,1,0)
+    'waterLevel = (eTape_slope * eTape)  + eTape_intercept
     AvgRun(dailyWaterLevel, 1, waterLevel, 24)
 
     ' Calculate change in hourly and daily water levels and a 6 hour running mean hourly change in water level
@@ -227,31 +239,44 @@ counter = -1
     sdDeltaDailyWL_24hr = Sqr(sumOfSquares / 23)
 
 
-    ' Testing using StdDevSpa to calculate the standard deviation after storing the last 24 hours of water levels in an array.
-    delta_wl_24_array(sumDiffIndex) = deltaDailyWaterLevel
-    AvgSpa(avgTest, 24, delta_wl_24_array)
-    StdDevSpa(sdTest, 24, delta_wl_24_array)
 
 
 	' Check if the program has been running long enough to avoid an event trigger
   ' that is based only on normal noise in the measurement data
-	If preevent_check <> 0 Then
+	'If preevent_check <> 0 Then
 
 		If samplingEvent = false Then
-		  samplingEvent = deltaDailyWaterLevel >= meanDeltaDailyWL_24hr + 2.575829 * sdDeltaDailyWL_24hr AND meanDeltaWL_6hr > minimum_event_size
+      ' Testing using StdDevSpa to calculate the standard deviation after storing the last 24 hours of water levels in an array.
+      delta_wl_24_array(sumDiffIndex) = deltaDailyWaterLevel
+      AvgSpa(avgTest, 24, delta_wl_24_array)
+      StdDevSpa(sdTest, 24, delta_wl_24_array)
+      sample_threshold = avgTest + 2.575829 * sdTest
+		  'samplingEvent = deltaDailyWaterLevel >= meanDeltaDailyWL_24hr + 2.575829 * sdDeltaDailyWL_24hr AND meanDeltaWL_6hr > minimum_event_size
+      If preevent_check <> 0 Then
+        samplingEvent = deltaDailyWaterLevel >= sample_threshold AND meanDeltaWL_6hr > minimum_event_size
+      End If
       hydrographLimb = "NA"
 		End If
 
 		If samplingEvent = true Then
 
 		  If startWaterLevel = 0 Then
-			  startWaterLevel = waterLevel
+			  startWaterLevel = laggedWaterLevel
+        delta_wl_24_array(sumDiffIndex) = delta_wl_24_array(sumDiffIndex - 1)
+        'preevent_mean = avgTest
+        'preevent_sd = sdTest
+        'preevent_delta_wl_24_array = delta_wl_24_array
 			  hydrographLimb = "rising"
 		  Else
 			  If meanDeltaWL_2hr < 0 Then
 			      hydrographLimb = "falling"
 			  End If
 		  End If
+
+      delta_wl_24_array(sumDiffIndex) = delta_wl_24_array + (RND > 0.5) * RND * sdTest ' Should add random noise to this + RND * preevent_sd
+      AvgSpa(avgTest, 24, delta_wl_24_array)
+      StdDevSpa(sdTest, 24, delta_wl_24_array)
+      sample_threshold = avgTest + 2.575829 * sdTest
 
 		  If bottleNumber < 24 Then
 			  PulsePort(1, 25000)
@@ -263,12 +288,15 @@ counter = -1
 		  If hydrographLimb = "falling" AND waterLevel <= startWaterLevel * falling_limb_threshold Then
 		   samplingEvent = false
 		   startWaterLevel = 0
+       'avgTest = preevent_mean
+       'sdTest = preevent_sd
+       'delta_wl_24_array = preevent_delta_wl_24_array
 		   hydrographLimb = "NA"
 		  EndIf
 
 		EndIf
 
-	EndIf
+	'EndIf
 
     If interval_sampling AND hoursAfterSample = nonevent_interval AND bottleNumber < 24 Then
       PulsePort(1, 25000)
