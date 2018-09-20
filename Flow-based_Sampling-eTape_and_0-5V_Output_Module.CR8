@@ -12,7 +12,7 @@
 ' whenever a storm event is detected and every 24 hours if a storm event is not
 ' detected. It calculates a rolling mean hourly water level change (2-hr, 6-hr,
 ' and 24-hr), and a rolling standard deviation of the change in 24-hr mean
-' water level. An event is triggered when the change in 24-hr mean water level 
+' water level. An event is triggered when the change in 24-hr mean water level
 ' is greater than the mean change plus a 99.5% confidence interval (2.58 * SD).
 ' The 6-hr rolling mean water level must be greater than minimum_event_size (cm)
 ' for an event to be triggered. The hydrograph limb is set to "rising" and hourly
@@ -204,7 +204,7 @@ PreserveVariables()
 bottleNumber = 0
 counter = -1
 
-	Scan(5, sec, 1, 0)
+	Scan(60, min, 1, 0)
 
     hoursAfterSample = hoursAfterSample + 1
     counter = counter + 1
@@ -215,9 +215,10 @@ counter = -1
     PanelTemp(loggerTemp, _60Hz)
 
   	' Measure eTape and calculate water level from eTape calibration. Use running average to calculate the mean daily water level
-	  'VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
-    Therm107(waterLevel,1,1,1,0,_60Hz,1,0)
-    'waterLevel = (eTape_slope * eTape)  + eTape_intercept
+	  VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
+    'Temperature probe used for in-lab testing:
+    'Therm107(waterLevel,1,1,1,0,_60Hz,1,0)
+    waterLevel = (eTape_slope * eTape)  + eTape_intercept
     AvgRun(dailyWaterLevel, 1, waterLevel, 24)
 
     ' Calculate change in hourly and daily water levels and a 6 hour running mean hourly change in water level
