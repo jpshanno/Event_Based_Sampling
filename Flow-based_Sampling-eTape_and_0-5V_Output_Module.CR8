@@ -19,12 +19,12 @@
 ' sampling begins. When the 2-hr rolling mean water level change is less than 0 the
 ' rising limb is set to "falling". Hourly sampling continues until the water
 ' level returns to a user-defined percentage of the water level at the start of
-' the event (see non-event_interval constant and set as decimal value, i.e.
+' the event (see nonevent_interval constant and set as decimal value, i.e.
 ' 1.0 = 100%).
 
 ' When the program is recompiled on the datalogger most existing variable values
 ' a retained. The variables bottleNumber, startWaterLevel, bottleNumber,
-' hoursAfterSample, hydrographLimb, counter, and pre-event_check are reset, which
+' hoursAfterSample, hydrographLimb, counter, and preevent_check are reset, which
 ' makes the assumption that the logger would not be restarted during a flow event.
 ' Additionally when the program is recompiled no samples will be taken until the
 ' summed squared differences from the mean of the change in the 24-hour rolling
@@ -57,10 +57,10 @@
 
 ' falling_limb_threshold - The water level used to signal the end of an event,
 '   defined as a proportion of the water level at the start of an event.
-' non-event_interval - The number of hours between samples during non-event flow
+' nonevent_interval - The number of hours between samples during non-event flow
 ' eTape_intercept - The slope of the eTape calibration curve
 ' eTape_slope - The intercept of the eTape calibration curve
-' pre-event_period - The number of hours of data to capture before checking for
+' preevent_period - The number of hours of data to capture before checking for
 '   events. This helps prevent false positives.
 ' minimum_event_size - The minimum change in the 6-hour rolling mean that would
 '   be considered an event. This is to avoid vey small changes from triggering an
@@ -85,17 +85,15 @@
 ' Set mode
 SequentialMode
 
-
-ConstTable (Set-up_Parameters)
-  falling_limb_threshold = 1.05
-  non-event_interval = 24
-  eTape_intercept = 0.498129
-  eTape_slope = 0.009891
-  interval_sampling = true
-  pre-event_period = 12
-  minimum_event_size = 0.1
+ConstTable (Setup_Parameters)
+  Const falling_limb_threshold = 1.05
+  Const nonevent_interval = 24
+  Const eTape_intercept = 0.498129
+  Const eTape_slope = 0.009891
+  Const interval_sampling = true
+  Const preevent_period = 12
+  Const minimum_event_size = 0.1
 EndConstTable
-
 
 ' Declare Variables and Units
 Public batteryVoltage
@@ -127,9 +125,14 @@ Public avgTest
 Public sdTest
 Public delta_wl_24_array(24)
 Dim I
-Dim pre-event_check
-
-
+Dim preevent_check
+' Dim falling_limb_threshold
+' Dim nonevent_interval
+' Dim eTape_intercept
+' Dim eTape_slope
+' Dim interval_sampling
+' Dim preevent_period
+' Dim minimum_event_size
 
 Units batteryVoltage = Volts
 Units loggerTemp = Celsius
@@ -146,7 +149,6 @@ Units meanDeltaDailyWL_24hr = cm
 Units sdDeltaDailyWL_24hr = cm
 Units startWaterLevel = cm
 Units hoursAfterSample = hours
-
 
 'Define Data Tables.
 DataTable (Diagnostics, 1, -1)
@@ -202,8 +204,8 @@ counter = -1
     PanelTemp(loggerTemp, _60Hz)
 
   	' Measure eTape and calculate water level from eTape calibration. Use running average to calculate the mean daily water level
-	VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
-	waterLevel = (eTape_slope * eTape)  + eTape_intercept
+	  VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
+	  waterLevel = (eTape_slope * eTape)  + eTape_intercept
     AvgRun(dailyWaterLevel, 1, waterLevel, 24)
 
     ' Calculate change in hourly and daily water levels and a 6 hour running mean hourly change in water level
@@ -218,8 +220,8 @@ counter = -1
     squareDiff(sumDiffIndex) = (deltaDailyWaterLevel - meanDeltaDailyWL_24hr)^2
     sumOfSquares = squareDiff(1) + squareDiff(2) + squareDiff(3) + squareDiff(4) + squareDiff(5) + squareDiff(6) + squareDiff(7) + squareDiff(8) + squareDiff(9) + squareDiff(10) + squareDiff(11) + squareDiff(12) + squareDiff(13) + squareDiff(14) + squareDiff(15) + squareDiff(16) + squareDiff(17) + squareDiff(18) + squareDiff(19) + squareDiff(20) + squareDiff(21) + squareDiff(22) + squareDiff(23) + squareDiff(24)
 
-    For I = pre-event_offset + 1 to 24
-      pre-event_check = squareDiff(I) + pre-event_check
+    For I = preevent_period + 1 to 24
+      preevent_check = squareDiff(I) + preevent_check
     Next I
 
     sdDeltaDailyWL_24hr = Sqr(sumOfSquares / 23)
@@ -233,7 +235,7 @@ counter = -1
 
 	' Check if the program has been running long enough to avoid an event trigger
   ' that is based only on normal noise in the measurement data
-	If pre-event_check <> 0 Then
+	If preevent_check <> 0 Then
 
 		If samplingEvent = false Then
 		  samplingEvent = deltaDailyWaterLevel >= meanDeltaDailyWL_24hr + 2.575829 * sdDeltaDailyWL_24hr AND meanDeltaWL_6hr > minimum_event_size
@@ -268,7 +270,7 @@ counter = -1
 
 	EndIf
 
-    If interval_sampling AND hoursAfterSample = non-event_interval AND bottleNumber < 24 Then
+    If interval_sampling AND hoursAfterSample = nonevent_interval AND bottleNumber < 24 Then
       PulsePort(1, 25000)
       hoursAfterSample = 0
       bottleNumber = bottleNumber + 1
