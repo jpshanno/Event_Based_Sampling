@@ -1,4 +1,5 @@
-' Event-based ISCO Sampling Triggered via a Standard eTape Assembly with Voltage Divider
+' Event-based ISCO Sampling Triggered via a Standard eTape Assembly with 0-5V
+' Output Module
 
 ' Author: Joe Shannon
 ' Last Modified: 2018-09-20
@@ -7,9 +8,9 @@
 ' Summary:
 ' --------
 ' This program is designed for a CR800 datalogger to connected to a standard
-' assembly eTape from Milone Technologies with the standard voltage divider
-' output. The purpose of the program is to trigger sampling on an ISCO autosampler
-' whenever a storm event is detected and every 24 hours if a storm event is not
+' assembly eTape from Milone Technologies with the 0-5V Output Module. The
+' purpose of the program is to trigger sampling on an ISCO autosampler whenever
+' a storm event is detected and every 24 hours if a storm event is not
 ' detected. It calculates a rolling mean hourly water level change (2-hr, 6-hr,
 ' and 24-hr), and a rolling standard deviation of the change in 24-hr mean
 ' water level. An event is triggered when the change in 24-hr mean water level
@@ -39,7 +40,9 @@
 ' a 0-5 V output converter rather than a voltage divider. The latter probably the
 ' better option as the voltage divider is more robust than the output converter.
 ' Speaking with Chris Milone he said there is no chip in the voltage divider,
-' which means a wiring error will not destroy the eTape.
+' which means a wiring error will not destroy the eTape. However, measurement
+' resolution is lost when using a voltage divider due to the reduced range of
+' the output, 2.5V - 5V rather than 0-5V
 
 ' The linear regression used to convert eTape measurements (mV) to water level (cm)
 ' was taken from ...
@@ -189,7 +192,7 @@ bottle_number = 0
 
   	' Measure eTape and calculate water level from eTape calibration. Use running average to calculate the mean daily water level
 	  VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
-    
+
     'Temperature probe used for in-lab testing:
     'Therm107(water_level,1,1,1,0,_60Hz,1,0)
     water_level = (eTape_slope * eTape)  + eTape_intercept

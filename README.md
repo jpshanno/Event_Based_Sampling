@@ -13,20 +13,22 @@ Water levels (WL) are read and recorded hourly along with the hourly change in w
 (WL<sub>&Delta;2</sub>), 6 (WL<sub>&Delta;6</sub>), and 24-hr (WL<sub>&Delta;24</sub>) periods as
 well as the hourly change in WL<sub>&Delta;24</sub> (&Delta;WL<sub>&Delta;24</sub>). The 24-hr
 rolling standard deviation of WL<sub>&Delta;1</sub> is calculated and recorded (WL<sub>SD-24</sub>).
+No sampling will occur within the first 24-hours of deployment to avoid skewed mean and standard deviation values.
+When the system is rebooted in situ sampling can resume with no pause.
 An event is triggered when (&Delta;WL<sub>&Delta;24</sub>) is outside of the 99.5% confidence
-interval and WL<sub>&Delta;6</sub> is above a threshold, which is currently set at 0.1 cm.
-
+interval and WL<sub>&Delta;6</sub> is above a threshold, which can be defined in the constants table in the CR8 program.
 
 Sample if  
 &Delta;WL<sub>&Delta;24</sub> >= WL<sub>&Delta;24</sub> + 2.58 * WL<sub>SD-24</sub>
 AND WL<sub>&Delta;6</sub> > 0.1
 
-When an event is triggered a sample is taken, the `hydrographLimb` variable is set from `NA` to
+When an event is triggered a sample is taken, the `hydrograph_limb` variable is set from `NA` to
 'rising', and the water level is stored (WL<sub>Event</sub>. Samples are taken hourly and when
-WL<sub>&Delta;2</sub> is negative the `hydrographLimb` is set to 'falling'. Sampling is ended when
-WL falls to 1.1 times WL<sub>Event</sub> and `hydrographLimb` is set to `NA`.
+WL<sub>&Delta;2</sub> is negative the `hydrograph_limb` is set to 'falling'. Sampling is ended when
+WL falls to 1.1 times WL<sub>Event</sub> and `hydrograph_limb` is set to `NA`. During an event the previous change in daily water level (starting with the pre-event value) plus some noise within the standard deviation of daily water level changes is recorded rather than the actual water level changes. This is because within an event the standard deviation can become so large from the event flows that triggering another event less than 24 hours after the original event is essentially impossible.
 
-If 24 hours pass after the last sample a single sample is taken. Sampling will cease after 24 samples
+Interval sampling can be triggered to perform regular time-based sampling if
+there have not be any storm events. Sampling will cease after 24 samples
 to avoid sample mixing.
 
 # Equipment
@@ -62,7 +64,7 @@ __Diagnostics__
 __ISCO__  
 -bottleNumber  
 -waterLevel  
--hydrographLimb  
+-hydrograph_limb  
 
 __Water_Level__  
 -bottleNumber  
@@ -78,7 +80,7 @@ __Water_Level__
 -meanDeltaDailyWL_24hr  
 -sdDeltaDailyWL_24hr  
 -samplingEvent  
--hydrographLimb  
+-hydrograph_limb  
 -startWaterLevel  
 -hoursAfterSample  
 
