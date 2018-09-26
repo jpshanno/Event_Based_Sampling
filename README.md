@@ -83,16 +83,11 @@ __Water_Level__
 -hoursAfterSample  
 
 # To Do
-- [ ] Update ISCO wiring guide in CRBasic programs  
-- [ ] Set up a constants table for threshold values (0.1 cm, 24 hours between samples, yes or no for interval sampling, etc) to allow easier customization  
-    - THIS NEEDS TO BE A PRIORITY. Whenever restarting the program to reset the
-    bottle number it risks making a slowly rising hydrograph look like an events
-    because there is not 24-hours of data to smooth the mean and sd.
-- [ ] Evaluate and adjust as needed the 110% threshold for ending events  
 - [ ] Set a minimum water level to avoid interval sampling when no flow is present  
-- [ ] Add sequential mode call to program
 - [ ] Slow rising limbs are missed, not and quite event, but wet-up periods. Perhaps
 this is fine because it is captured by the interval sampling
+- [ ] Set a pre-event period value to to fill in the zeroes in the array with the
+ mean of the preevent_interval (would have artifically low sd). Also, first value
+ of delta WL is first measured water level - 0. Could launch and then run 'reboot' after the first reading
 - [ ] Add example data and figure
 - [ ] Convert intermediate variables to declaration by Dim rather than Public
-- [ ] Test storing deltaDailyWaterLevel in an array and calculating the standard deviation using StdDevSpa
