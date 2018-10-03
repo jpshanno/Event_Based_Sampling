@@ -92,4 +92,4 @@ this is fine because it is captured by the interval sampling
  mean of the preevent_interval (would have artifically low sd). Also, first value
  of delta WL is first measured water level - 0. Could launch and then run 'reboot' after the first reading
 - [ ] Add example data and figure
-- [ ] Convert intermediate variables to declaration by Dim rather than Public
+- [ ] Convert intermediate variables to declaration by Dim rather than Public  
