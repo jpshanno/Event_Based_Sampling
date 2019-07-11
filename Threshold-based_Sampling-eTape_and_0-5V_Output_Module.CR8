@@ -1,0 +1,209 @@
+' Event-based ISCO Sampling Triggered via a Standard eTape Assembly with 0-5V
+' Output Module
+
+' Author: Joe Shannon
+' Last Modified: 2018-09-20
+'
+
+' Summary:
+' --------
+' This program is designed for a CR800 datalogger to connected to a standard
+' assembly eTape from Milone Technologies with the 0-5V Output Module. The
+' purpose of the program is to trigger sampling on an ISCO autosampler whenever
+' a storm event is detected and every 24 hours if a storm event is not
+' detected. An event is defined as any hourly change in flow greater than
+' event_threshold, which has the default value of 0.5. Hourly sampling continues
+' until the water level returns to a user-defined percentage of the water level
+' at the start of the event (see non-event_interval constant and set as decimal
+' value, i.e. 1.0 = 100%).
+
+' The program can be recompiled without losing existing data by using the command
+' REBOOT in the terminal emulator when communicating with the datalogger. When
+' the program is recompiled on the datalogger most existing variable values
+' a retained, only the bottle number is reset to zero.
+
+' Notes:
+' ------
+
+' This calibration is for the eTape currently deployed at 113. It is fitted with
+' a 0-5 V output converter rather than a voltage divider. The latter probably the
+' better option as the voltage divider is more robust than the output converter.
+' Speaking with Chris Milone he said there is no chip in the voltage divider,
+' which means a wiring error will not destroy the eTape. However, measurement
+' resolution is lost when using a voltage divider due to the reduced range of
+' the output, 2.5V - 5V rather than 0-5V
+
+' The linear regression used to convert eTape measurements (mV) to water level (cm)
+' was taken from ...
+
+' Water Level (cm) = 0.009891 * eTape (mv)  + 0.498129
+
+' Set-up:
+' -------
+
+' The program is controlled via a table of constants that can be set manually
+' in this code before sending to the datalogger or can be accessed and adjusted
+' using the Terminal Emulator (function 'C') in Campbell Scientific's Loggernet
+' or PC200W software.
+
+' falling_limb_threshold - The water level used to signal the end of an event,
+'   defined as a proportion of the water level at the start of an event.
+' non-event_interval - The number of hours between samples during non-event flow
+' eTape_intercept - The slope of the eTape calibration curve
+' eTape_slope - The intercept of the eTape calibration curve
+' event_threshold - The threshold to determine if water levels changed enough in
+'   1 hour to be classified as an event.
+
+' Wiring:
+' -------
+
+' eTape	|	CR800
+' ---------------
+' Vin	|	12V
+' Vout	|	1H
+' Gnd	|	Ground
+
+' ISCO	|	CR800
+' ---------------
+' Pin A	|	SDI 12V
+' Pin C	|	SDI C1
+
+' -----------------------------------------------------------------------------
+
+
+
+
+' Set mode
+SequentialMode
+
+ConstTable (Setup_Parameters)
+  Const falling_limb_threshold = 1.05
+  Const nonevent_interval = 24
+  Const eTape_intercept = 0.498129
+  Const eTape_slope = 0.009891
+  Const interval_sampling = true
+  Const preevent_period = 12
+	Const event_threshold = 0.5
+EndConstTable
+
+' Declare Variables and Units
+Public battery_voltage As FLOAT
+Public bottle_number As LONG
+Public counter As LONG
+Public delta_water_level_cm As FLOAT
+Public eTape As FLOAT
+Public hourly_index As LONG
+Public hours_after_sample As LONG
+Public lagged_water_level_cm As FLOAT
+Public logger_temp As FLOAT
+Public preevent_water_level_cm As FLOAT
+Public sampling_event As BOOLEAN
+Public water_level_cm As FLOAT
+
+Units battery_voltage = Volts
+Units logger_temp = Celsius
+Units eTape = mV
+Units water_level_cm = cm
+Units lagged_water_level_cm = cm
+Units delta_water_level_cm = cm
+Units preevent_water_level_cm = cm
+Units hours_after_sample = hours
+
+'Define Data Tables.
+DataTable (Diagnostics, 1, -1)
+  Sample (1, battery_voltage, FLOAT)
+  Sample (1, logger_temp, FLOAT)
+EndTable
+
+DataTable (Water_Level, 1, -1) 'Set table size to # of records, or -1 to autoallocate.
+  Sample(1, bottle_number, LONG)
+  Sample(1, eTape, FLOAT)
+  Sample(1, water_level_cm, FLOAT)
+  Sample(1, lagged_water_level_cm, FLOAT)
+  Sample(1, delta_water_level_cm, FLOAT)
+  Sample(1, sampling_event, FLOAT)
+  Sample(1, preevent_water_level_cm, FLOAT)
+  Sample(1, hours_after_sample, LONG)
+EndTable
+
+DataTable (ISCO, 1, -1)
+  Sample(1, bottle_number, LONG)
+  Sample(1, water_level_cm, FLOAT)
+EndTable
+
+
+' Main Program
+BeginProg
+
+' Preserve the variables so that when the program is recompiled to reset the bottle_number the running
+' means and standard deviation will be retained.
+PreserveVariables()
+
+' Reset the bottle number and counter number
+bottle_number = 0
+
+	Scan(60, min, 1, 0)
+
+    hours_after_sample = hours_after_sample + 1
+    hourly_index = (counter MOD 24) + 1
+    counter = counter + 1
+
+    ' Default Datalogger Battery Voltage measurement BattV
+	  Battery(battery_voltage)
+    PanelTemp(logger_temp, _60Hz)
+
+  	' Measure eTape and calculate water level from eTape calibration. Use running average to calculate the mean daily water level
+	  VoltSE(eTape, 1, mV5000, 1, True, 0, _60Hz, 1, 0)
+
+    'Temperature probe used for in-lab testing:
+    'Therm107(water_level_cm,1,1,1,0,_60Hz,1,0)
+    water_level_cm = (eTape_slope * eTape)  + eTape_intercept
+
+    ' Make sure first scan has a water level change of 0
+    If counter = 1 Then
+      lagged_water_level_cm = water_level_cm
+    End If
+
+    ' Calculate change in hourly water level
+    delta_water_level_cm = water_level_cm - lagged_water_level_cm
+
+    ' During non-event flow calculate the mean and standard deviation of the
+    ' daily water level over a 24 hour period. Then compare the current change in
+    ' daily water level to the sampling threshold.
+		If sampling_event = false AND delta_water_level_cm > event_threshold Then
+      sampling_event = true
+      preevent_water_level_cm = lagged_water_level_cm
+		End If
+
+    If sampling_event = true Then
+      ' Check the bottle number and then sample, updating the bottle number record and resetting the time since last sample
+		  If bottle_number < 24 Then
+			  PulsePort(1, 25000)
+			  hours_after_sample = 0
+			  bottle_number = bottle_number + 1
+			  CallTable(ISCO)
+		  EndIf
+
+      ' At the end of an event reset the starting water level and the hydrograph limb
+		  If water_level_cm <= preevent_water_level_cm * falling_limb_threshold Then
+		   sampling_event = false
+		   preevent_water_level_cm = 0
+		  EndIf
+
+		EndIf
+
+    ' If interval sampling is occurring then check the bottle number and then sample, updating the bottle number record and resetting the time since last sample
+    If interval_sampling AND hours_after_sample = nonevent_interval AND bottle_number < 24 Then
+      PulsePort(1, 25000)
+      hours_after_sample = 0
+      bottle_number = bottle_number + 1
+      CallTable(ISCO)
+    EndIf
+
+    lagged_water_level_cm = water_level_cm
+
+    CallTable(Diagnostics)
+    CallTable(Water_Level)
+
+  NextScan
+EndProg
